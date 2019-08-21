@@ -1,0 +1,28 @@
+# vim:ft=ansible:
+---
+
+- name: revoke client sert
+  shell: . ./vars && ./revoke-full {{ item }}
+    chdir=/etc/openvpn/easy-rsa
+  with_items: "{{ revoke_openvpn_users }}"
+  notify:
+    - Backup openvpn certificates
+    - Backup index and serial
+
+- name: delete client cert
+  file:
+    path: "/etc/openvpn/easy-rsa/keys/{{ item[0] }}.{{ item[1] }}"
+    state: absent
+  with_nested:
+    - "{{ revoke_openvpn_users }}"
+    - [ "csr", "crt", "key" ]
+  notify: Backup openvpn certificates
+
+- name: delete client ovpn files
+  file:
+    path: "/etc/openvpn/ovpn/{{ item[0] }}.{{ item[1] }}"
+    state: absent
+  with_nested:
+    - "{{ revoke_openvpn_users }}"
+    - [ "ovpn", "ovpn.gpg" ]
+  notify: Backup openvpn client configs

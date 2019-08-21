@@ -1,0 +1,34 @@
+# vim:ft=ansible:
+---
+
+key_country: COUNTRY
+key_province: STATE
+key_city: CITY
+key_org: COMPANY
+key_email: CONTACT@COMPANY.COM
+
+openvpn_server_port: 1194
+openvpn_server_proto: udp
+
+openvpn_daemon_user: nobody
+openvpn_daemon_group: nogroup
+
+openvpn_users_gpg_enabled: true
+
+# List of users to be created
+# openvpn_users:
+#  - name: your.name
+#    email: your.email (that you used to generate/upload pgp key)
+#    slack_id: your.id
+#    gpg_enabled: true  # optional parameter, default: {{openvpn_users_gpg_enabled}} or 'true'
+openvpn_users: []
+
+revoke_openvpn_users: []
+
+vault_slack_token: "undefined"
+
+# Default channel to send openvpn client files
+# if username doesn't exist in slack team
+openvpn_default_slack_channel: openvpn
+
+check_for_new_users_regulary: true

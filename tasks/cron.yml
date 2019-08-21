@@ -1,0 +1,17 @@
+# vim:ft=ansible:
+---
+
+- name: create directory to store log file
+  file:
+    path: /var/log/openvpn-users
+    owner: ubuntu
+    state: directory
+
+- name: setup crontab task to add new openvpn users every few minutes
+  cron:
+    name: "openvpn install clients"
+    cron_file: openvpn-install-clients
+    minute: "*/10"
+    job: "cd /opt/infrastructure/ansible && git pull && /usr/bin/ansible-playbook -i inventories/localhost playbooks/openvpn-users.yml --vault-password-file /root/.vault.txt > /var/log/openvpn-users/openvpn.log 2>&1"
+    user: root
+    state: present

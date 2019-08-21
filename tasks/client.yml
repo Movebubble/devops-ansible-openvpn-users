@@ -1,0 +1,99 @@
+# vim:ft=ansible:
+---
+
+- name: install tool that provides command json_reformat
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - yajl-tools
+    - gnupg
+
+- name: Install scripts
+  copy:
+    dest: "/usr/local/bin/{{ item }}"
+    mode: 0755
+    src: "{{ item }}"
+    owner: root
+    group: root
+  with_items:
+    - send-to-slack.sh
+    - import-gpg-key.sh
+
+- name: Create openvpn directory within user home dir
+  file:
+    path: /etc/openvpn/ovpn/
+    state: directory
+    owner: root
+    group: ubuntu
+    mode: 0750
+
+- name: generate client openvpn cert and key
+  shell: . ./vars && ./pkitool {{ item.name }}
+  args:
+    creates: "/etc/openvpn/easy-rsa/keys/{{ item.name }}.crt"
+    chdir: /etc/openvpn/easy-rsa
+  with_items: "{{ openvpn_users }}"
+  notify:
+    - Backup openvpn certificates
+    - Backup index and serial
+
+# Duplicate stage from main file to correct permissions for the keys directory
+# For unknown reason it is differ than 711
+- name: Create keys directory
+  file:
+    path: /etc/openvpn/easy-rsa/keys
+    state: directory
+    mode: 0711
+    owner: "{{ openvpn_daemon_user }}"
+    group: "{{ openvpn_daemon_group }}"
+
+- name: generate client ovpn file
+  template:
+    src: client.j2
+    dest: "/etc/openvpn/ovpn/{{ item.name }}.ovpn"
+    owner: root
+    group: ubuntu
+    mode: 0640
+  with_items: "{{ openvpn_users }}"
+  register: create_ovpn
+  notify: Backup openvpn client configs
+
+- name: import gpg public keys from key server
+  shell: /usr/local/bin/import-gpg-key.sh --email "{{ item.item.email }}"
+  when:
+    - item.item.gpg_enabled|default(openvpn_users_gpg_enabled)|bool
+  with_items: "{{ create_ovpn.results }}"
+  register: pgp_public_key
+  ignore_errors: yes
+
+- name: send error message to slack
+  shell: /usr/local/bin/send-to-slack.sh --slack "{{ item.item.item.name }}" --token "{{ vault_slack_token }}" --message "{{ item.stderr }}"
+  with_items: "{{ pgp_public_key.results }}"
+  when:
+    - item.item.item.gpg_enabled|default(openvpn_users_gpg_enabled)|bool
+    - item.rc == 1
+  register: send_error
+
+- name: encrypt ovpn file
+  shell: gpg --always-trust --encrypt --recipient "{{ item.item.item.email }}" "/etc/openvpn/ovpn/{{ item.item.item.name }}.ovpn"
+  args:
+    creates: "/etc/openvpn/ovpn/{{ item.item.item.name }}.ovpn.gpg"
+  with_items: "{{ pgp_public_key.results }}"
+  when:
+    - item.item.item.gpg_enabled|default(openvpn_users_gpg_enabled)|bool
+    - item.rc == 0
+  register: encrypt_ovpn
+  notify: Backup openvpn client configs
+
+- name: send encrypted ovpn file to slack
+  shell: /usr/local/bin/send-to-slack.sh --slack-id "{{ item.item.item.item.slack_id }}" --token "{{ vault_slack_token }}" --file "/etc/openvpn/ovpn/{{ item.item.item.item.name }}.ovpn.gpg"
+  with_items: "{{ encrypt_ovpn.results }}"
+  when: item.changed
+
+- name: send plain ovpn file to slack
+  shell: /usr/local/bin/send-to-slack.sh --slack-id "{{ item.item.slack_id }}" --token "{{ vault_slack_token }}" --file "/etc/openvpn/ovpn/{{ item.item.name }}.ovpn"
+  with_items: "{{ create_ovpn.results }}"
+  when:
+    - not item.item.gpg_enabled|default(openvpn_users_gpg_enabled)|bool
+    - item.changed

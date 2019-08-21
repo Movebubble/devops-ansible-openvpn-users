@@ -1,0 +1,23 @@
+client
+<ca>
+{{ lookup('file', '/etc/openvpn/easy-rsa/keys/ca.crt') }}
+</ca>
+<cert>
+{{ lookup('file', '/etc/openvpn/easy-rsa/keys/' + item.name + '.crt') }}
+</cert>
+<key>
+{{ lookup('file', '/etc/openvpn/easy-rsa/keys/' + item.name + '.key') }}
+</key>
+dev tun
+proto {{ openvpn_server_proto }}
+remote {{ ansible_ec2_public_ipv4 }} {{ openvpn_server_port }}
+comp-lzo
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+mute-replay-warnings
+ns-cert-type server
+verb 3
+mute 20
+cipher AES-256-CBC

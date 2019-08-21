@@ -1,0 +1,15 @@
+# vim:ft=ansible:
+---
+
+- name: Get ec2 metadata
+  ec2_metadata_facts:
+
+- name: Generate clients ovpn files
+  import_tasks: client.yml
+
+- name: Revoke clients ovpn files
+  import_tasks: revoke-client.yml
+
+- name: install cron task to install openvpn clients every few minutes
+  import_tasks: cron.yml
+  when: check_for_new_users_regulary

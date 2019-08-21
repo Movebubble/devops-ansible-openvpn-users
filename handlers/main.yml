@@ -1,0 +1,30 @@
+---
+
+- name: Backup openvpn client configs
+  s3_sync:
+    bucket: "{{ openvpn_backup_bucket }}"
+    key_prefix: openvpn/ovpn
+    file_root: /etc/openvpn/ovpn
+    include: "*.ovpn.gpg"
+    delete: yes
+    region: "{{ ansible_ec2_placement_region }}"
+
+- name: Backup openvpn certificates
+  s3_sync:
+    bucket: "{{ openvpn_backup_bucket }}"
+    key_prefix: openvpn/easy-rsa/keys
+    file_root: /etc/openvpn/easy-rsa/keys
+    delete: yes
+    region: "{{ ansible_ec2_placement_region }}"
+
+# Handler "Backup openvpn certificates" does not always make backups for serial and index.txt
+# I guess due to veri small size of that files
+- name: Backup index and serial
+  s3_sync:
+    bucket: "{{ openvpn_backup_bucket }}"
+    key_prefix: openvpn/easy-rsa/keys
+    file_root: /etc/openvpn/easy-rsa/keys
+    include: "serial,index.txt,index.txt.attr"
+    delete: no
+    file_change_strategy: force
+    region: "{{ ansible_ec2_placement_region }}"
